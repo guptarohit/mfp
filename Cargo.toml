@@ -1,9 +1,18 @@
 [package]
 name = "mfp"
+description = "A command-line utility for playing music mixes for programming & focus (from musicforprogramming.net), unlocking the flow state!"
 version = "0.1.0"
+authors = ["Rohit Gupta"]
 edition = "2021"
+readme = "README.md"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+homepage = "https://github.com/guptarohit/mfp"
+repository = "https://github.com/guptarohit/mfp"
+
+keywords = ["cli", "music", "utility", "command-line", "musicforprogramming"]
+categories = ["command-line-utilities"]
+license = "BSD-3-Clause"
+
 
 [dependencies]
 reqwest = { version = "0.11.18", features = ["blocking"] }
@@ -12,3 +21,5 @@ rodio = "0.17.1"
 rand = "0.8.5"
 minimp3 = "0.5.1"
 clap = { version = "4.3.10", features = ["derive"] }
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
