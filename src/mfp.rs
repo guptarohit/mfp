@@ -23,10 +23,10 @@ impl Mfp {
             .iter()
             .map(|item| {
                 let enclosure = item.enclosure().map(|enc| Enclosure {
-                        url: enc.url().to_string(),
-                        length: enc.length().parse::<u64>().unwrap_or_default(),
-                        mime_type: enc.mime_type().to_string(),
-                    });
+                    url: enc.url().to_string(),
+                    length: enc.length().parse::<u64>().unwrap_or_default(),
+                    mime_type: enc.mime_type().to_string(),
+                });
 
                 let keywords = item
                     .itunes_ext()
