@@ -9,7 +9,11 @@ GitHub: https://github.com/guptarohit/mfp";
 #[derive(Parser, Debug)]
 #[clap(author, version, about = ABOUT)]
 pub struct Args {
-    /// Track Number, between 1 and ~65
+    /// Track Number, between 1 and ~68
     #[clap(short, long)]
     pub track_number: Option<u16>,
+
+    /// Volume, between 0 and 9
+    #[clap(short, long, default_value_t = 9)]
+    pub volume: u8,
 }

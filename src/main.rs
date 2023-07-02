@@ -11,23 +11,23 @@ use rand::thread_rng;
 use rodio::Source;
 use utils::play_audio_from_url;
 
-fn play_random_episode(rss_feed: &Mfp) {
+fn play_random_episode(rss_feed: &Mfp,  volume: u8) {
     let mut rng = thread_rng();
 
     if let Some(random_episode) = rss_feed.items.choose(&mut rng) {
-        play_episode(random_episode);
+        play_episode(random_episode, volume);
     } else {
         eprintln!("No Tracks found");
     }
 }
 
-fn play_episode(episode: &mfp::Episode) {
+fn play_episode(episode: &mfp::Episode, volume: u8) {
     println!("Track name: {}", episode.title);
     println!("Track published date: {}", episode.pub_date);
     println!("Track duration: {}", episode.duration);
 
     if let Some(enclosure) = &episode.enclosure {
-        play_audio_from_url(&enclosure.url);
+        play_audio_from_url(&enclosure.url, volume);
     } else {
         eprintln!("No track data for the selected track");
     }
@@ -38,6 +38,10 @@ fn main() {
 
     let args = Args::parse();
 
+    if args.volume > 9 {
+        return eprintln!("Volume must be between 0 and 9")
+    }
+
     let total_tracks = rss_feed.items.len();
 
     if let Some(requested_track_number) = args.track_number {
@@ -47,9 +51,9 @@ fn main() {
         } else {
             let episode_index = total_tracks - requested_track_number;
             let episode = &rss_feed.items[episode_index];
-            play_episode(episode);
+            play_episode(episode, args.volume);
         }
     } else {
-        play_random_episode(&rss_feed);
+        play_random_episode(&rss_feed, args.volume);
     }
 }

@@ -3,40 +3,39 @@
 A command-line utility for playing music mixes for programming & focus (from [musicforprogramming.net](https://musicforprogramming.net)), unlocking the flow state!
 
 
-## Install
+## Installation
 
-- Download pre-built binary from [GitHub release page](https://github.com/guptarohit/mfp/releases).
-
-  or
-
-- Install with [Cargo](https://rustup.rs/) 📦:
+Using [Cargo](https://rustup.rs/) 📦:
   
-  ```
-  cargo install mfp
-  ```
+```bash
+cargo install mfp
+```
 
-  After installation, run `mfp` in command line to start.
+Or download pre-built binary from [GitHub release page](https://github.com/guptarohit/mfp/releases).
+
+After installation, run `mfp` in command line to start.
 
 
 ## Usage
 
-``` bash  
+```bash  
 mfp [OPTIONS]
 
-OPTIONS:
-    -h, --help                 Print help information
-    -t, --track-number         Select track number to play
-    -V, --version              Print version information
+Options:
+  -t, --track-number <TRACK_NUMBER>  Track Number, between 1 and ~68
+  -v, --volume <VOLUME>              Volume, between 0 and 9 [default: 9]
+  -h, --help                         Print help
+  -V, --version                      Print version
 ```
 
 
 ## Acknowledgements
 
-Inspired from:
-* https://github.com/JasonWei512/code-radio-cli
-* https://github.com/isdampe/music-for-programming
+Inspired from: https://github.com/JasonWei512/code-radio-cli
 
-Music stream from [musicforprogramming.net](https://musicforprogramming.net)
+and https://github.com/isdampe/music-for-programming
+
+Mixes streams from [musicforprogramming.net](https://musicforprogramming.net)
 
 ## Contributing
 
