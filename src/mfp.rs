@@ -5,15 +5,15 @@ use crate::utils::fetch_rss_data;
 const RSS_URL: &str = "https://musicforprogramming.net/rss.xml";
 
 // #[derive(Debug)]
-pub struct MFP {
+pub struct Mfp {
     pub title: String,
     pub link: String,
     pub description: String,
     pub items: Vec<Episode>,
 }
 
-impl MFP {
-    pub fn new() -> Result<MFP, Box<dyn std::error::Error>> {
+impl Mfp {
+    pub fn new() -> Result<Mfp, Box<dyn std::error::Error>> {
         let rss_data = fetch_rss_data(RSS_URL).expect("Failed to fetch RSS data");
 
         let channel = Channel::read_from(rss_data.as_bytes())?;
@@ -22,13 +22,11 @@ impl MFP {
             .items()
             .iter()
             .map(|item| {
-                let enclosure = item.enclosure().and_then(|enc| {
-                    Some(Enclosure {
+                let enclosure = item.enclosure().map(|enc| Enclosure {
                         url: enc.url().to_string(),
                         length: enc.length().parse::<u64>().unwrap_or_default(),
                         mime_type: enc.mime_type().to_string(),
-                    })
-                });
+                    });
 
                 let keywords = item
                     .itunes_ext()
@@ -52,7 +50,7 @@ impl MFP {
             })
             .collect();
 
-        let feed = MFP {
+        let feed = Mfp {
             title: channel.title().to_owned(),
             link: channel.link().to_owned(),
             description: channel.description().to_owned(),
