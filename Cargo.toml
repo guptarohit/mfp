@@ -11,3 +11,4 @@ rss = "2.0.4"
 rodio = "0.17.1"
 rand = "0.8.5"
 minimp3 = "0.5.1"
+clap = { version = "4.3.10", features = ["derive"] }
