@@ -37,14 +37,13 @@ fn play_episode(episode: &mfp::Episode, volume: u8) {
 }
 
 fn main() {
-    let rss_feed = Mfp::new().expect("Failed to fetch RSS data");
-
     let args = Args::parse();
 
     if args.volume > 9 {
         return eprintln!("Volume must be between 0 and 9");
     }
 
+    let rss_feed = Mfp::new().expect("Failed to fetch RSS data");
     let total_tracks = rss_feed.items.len();
 
     if let Some(requested_track_number) = args.track_number {
