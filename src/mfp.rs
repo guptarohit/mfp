@@ -1,6 +1,9 @@
 use rss::Channel;
 
+use std::time::Duration;
+
 use crate::utils::fetch_rss_data;
+use indicatif::{ProgressBar, ProgressStyle};
 
 const RSS_URL: &str = "https://musicforprogramming.net/rss.xml";
 
@@ -14,7 +17,17 @@ pub struct Mfp {
 
 impl Mfp {
     pub fn new() -> Result<Mfp, Box<dyn std::error::Error>> {
+        let pb = ProgressBar::new_spinner();
+        pb.enable_steady_tick(Duration::from_millis(120));
+        pb.set_style(
+            ProgressStyle::with_template("{spinner:} {msg}")
+                .unwrap()
+                .tick_strings(&["◴", "◷", "◶", "◵"]),
+        );
+        pb.set_message("Fetching metadata from musicforprogramming.net");
         let rss_data = fetch_rss_data(RSS_URL).expect("Failed to fetch RSS data");
+
+        pb.finish_and_clear();
 
         let channel = Channel::read_from(rss_data.as_bytes())?;
 

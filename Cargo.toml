@@ -21,5 +21,6 @@ rodio = "0.17.1"
 rand = "0.8.5"
 minimp3 = "0.5.1"
 clap = { version = "4.3.10", features = ["derive"] }
+indicatif = "0.17.5"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
