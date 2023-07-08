@@ -1,0 +1,90 @@
+# Build on push and pull request.
+# create a draft release with built binaries and changelog, when a tag like "v0.1.0" is pushed.
+
+name: Build
+
+on: [push, pull_request, workflow_dispatch]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  create-draft-release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_upload_url: ${{ steps.create-draft-release.outputs.upload_url }}
+
+    steps:
+    - name: Create draft release
+      id: create-draft-release
+      uses: ncipollo/release-action@v1
+      if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+      with:
+        draft: true
+        generateReleaseNotes: true
+
+  build-and-upload-artifact:
+    needs: create-draft-release
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact-name: ubuntu-x86_64-gnu
+            prebuild-config: |
+              sudo apt-get update
+              sudo apt-get install -y libasound2-dev
+
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact-name: windows-x86_64-msvc
+
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact-name: macos-x86_64
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set exe extension for Windows
+      run: echo "EXE=.exe" >> $env:GITHUB_ENV
+      if: startsWith(matrix.os, 'windows')
+
+    - name: Install `rust` toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        profile: minimal
+        target: ${{ matrix.target }}
+
+    - name: Prebuild config
+      run: ${{ matrix.prebuild-config }}
+
+    - name: Build
+      run: cargo build --release --target=${{ matrix.target }}
+
+    - name: Run tests
+      run: cargo test --release
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ matrix.artifact-name }}
+        path: target/${{ matrix.target }}/release/mfp${{ env.EXE }}
+
+    - name: Get version from tag
+      id: extract-version
+      run: |
+        echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+      shell: bash
+
+    - name: Upload artifact to release
+      uses: shogo82148/actions-upload-release-asset@v1
+      if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+      with:
+        upload_url: ${{ needs.create-draft-release.outputs.release_upload_url }}
+        asset_name: mfp-${{ steps.extract-version.outputs.version }}-${{ matrix.artifact-name }}${{ env.EXE }}
+        asset_path: target/${{ matrix.target }}/release/mfp${{ env.EXE }}
