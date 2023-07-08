@@ -2,6 +2,8 @@
 
 A command-line utility for playing music mixes for programming & focus (from [musicforprogramming.net](https://musicforprogramming.net)), unlocking the flow state!
 
+![Screenshot](./.github/images/mfp_screenshot.png)
+
 
 ## Installation
 
@@ -13,7 +15,7 @@ cargo install mfp
 
 Or download pre-built binary from [GitHub release page](https://github.com/guptarohit/mfp/releases).
 
-After installation, run `mfp` in command line to start.
+After installation, run `mfp` in command line to start. Plays a random track if not specified with `-t` flag.
 
 
 ## Usage
@@ -27,6 +29,8 @@ Options:
   -h, --help                         Print help
   -V, --version                      Print version
 ```
+
+e.g. `mfp -t 1 -v 7`
 
 
 ## Acknowledgements
