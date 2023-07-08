@@ -1,5 +1,8 @@
 # mfp: music for programming
 
+[![Crate](https://img.shields.io/crates/v/mfp.svg?color=orange)](https://crates.io/crates/mfp)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/guptarohit/mfp)](https://github.com/guptarohit/mfp/releases)
+
 A command-line utility for playing music mixes for programming & focus (from [musicforprogramming.net](https://musicforprogramming.net)), unlocking the flow state!
 
 ![Screenshot](./.github/images/mfp_screenshot.png)
