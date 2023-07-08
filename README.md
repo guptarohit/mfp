@@ -38,11 +38,9 @@ e.g. `mfp -t 1 -v 7`
 
 ## Acknowledgements
 
-Inspired from: https://github.com/JasonWei512/code-radio-cli
+Inspired from [code radio cli](https://github.com/JasonWei512/code-radio-cli) and [music for programming](https://github.com/isdampe/music-for-programming) (currently not functional)
 
-and https://github.com/isdampe/music-for-programming
-
-Mixes streams from [musicforprogramming.net](https://musicforprogramming.net)
+Mixes streams from [musicforprogramming.net](https://musicforprogramming.net) 🎵
 
 ## Contributing
 
