@@ -42,23 +42,20 @@ jobs:
             artifact-name: windows-x86_64-msvc
 
           - os: macos-latest
-            target: x86_64-apple-darwin
-            artifact-name: macos-x86_64
+            target: aarch64-apple-darwin
+            artifact-name: macos-aarch64
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Set exe extension for Windows
       run: echo "EXE=.exe" >> $env:GITHUB_ENV
       if: startsWith(matrix.os, 'windows')
 
     - name: Install `rust` toolchain
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
-        toolchain: stable
-        override: true
-        profile: minimal
-        target: ${{ matrix.target }}
+        targets: ${{ matrix.target }}
 
     - name: Prebuild config
       run: ${{ matrix.prebuild-config }}
@@ -70,7 +67,7 @@ jobs:
       run: cargo test --release
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.artifact-name }}
         path: target/${{ matrix.target }}/release/mfp${{ env.EXE }}

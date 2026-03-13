@@ -7,7 +7,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 
 const RSS_URL: &str = "https://musicforprogramming.net/rss.xml";
 
-// #[derive(Debug)]
+#[allow(dead_code)]
 pub struct Mfp {
     pub title: String,
     pub link: String,
@@ -74,6 +74,7 @@ impl Mfp {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct Episode {
     pub title: String,
     pub link: String,
@@ -84,6 +85,7 @@ pub struct Episode {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct Enclosure {
     pub url: String,
     pub length: u64,

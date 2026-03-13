@@ -1,10 +1,53 @@
-use reqwest::blocking::get;
+use reqwest::blocking::{get, Client};
 use rodio::OutputStream;
 use std::fmt::Write;
 
 use crate::mp3_stream_decoder::Mp3StreamDecoder;
+use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use std::time::{Duration, Instant};
+
+/// Number of seconds to skip forward or backward when seeking.
+const SEEK_STEP_SECS: u64 = 10;
+
+/// Result of audio playback — whether the track finished naturally or the user quit.
+pub enum PlaybackResult {
+    /// Track played to completion.
+    Finished,
+    /// User pressed 'q' to stop playback.
+    Quit,
+}
+
+/// Guard that disables raw mode when dropped, ensuring the terminal is restored
+/// even on panic or early return.
+struct RawModeGuard;
+
+impl RawModeGuard {
+    fn enable() -> Result<Self, std::io::Error> {
+        enable_raw_mode()?;
+        Ok(RawModeGuard)
+    }
+}
+
+impl Drop for RawModeGuard {
+    fn drop(&mut self) {
+        let _ = disable_raw_mode();
+    }
+}
+
+/// Calculate the elapsed seconds within a playback segment, excluding paused time.
+fn segment_elapsed_secs(
+    segment_start: Instant,
+    pause_started_at: Option<Instant>,
+    total_paused: Duration,
+) -> u64 {
+    if let Some(paused_at) = pause_started_at {
+        (paused_at.duration_since(segment_start) - total_paused).as_secs()
+    } else {
+        (segment_start.elapsed() - total_paused).as_secs()
+    }
+}
 
 pub fn fetch_rss_data(url: &str) -> Result<String, Box<dyn std::error::Error>> {
     let response = get(url)?;
@@ -12,18 +55,66 @@ pub fn fetch_rss_data(url: &str) -> Result<String, Box<dyn std::error::Error>> {
     Ok(body)
 }
 
-pub fn play_audio_from_url(url: &str, volume: u8, audio_duration_sec: u64) {
-    let http_response = get(url).expect("Failed to fetch audio file");
-    let source = Mp3StreamDecoder::new(http_response).unwrap();
-    let (_stream, stream_handle) =
-        OutputStream::try_default().expect("Failed to create audio stream");
+/// Fetch the audio stream starting at `byte_offset` using an HTTP Range request,
+/// create a decoder and sink, and return the sink ready for playback.
+fn start_playback_from_offset(
+    client: &Client,
+    url: &str,
+    stream_handle: &rodio::OutputStreamHandle,
+    volume: u8,
+    byte_offset: u64,
+) -> Result<rodio::Sink, Box<dyn std::error::Error>> {
+    let response = if byte_offset == 0 {
+        client.get(url).send()?
+    } else {
+        client
+            .get(url)
+            .header("Range", format!("bytes={byte_offset}-"))
+            .send()?
+    };
 
-    let sink = rodio::Sink::try_new(&stream_handle).unwrap();
+    let source = Mp3StreamDecoder::new(response)
+        .map_err(|_| "Failed to create MP3 decoder from HTTP response")?;
+
+    let sink = rodio::Sink::try_new(stream_handle)?;
     sink.append(source);
     sink.set_volume(volume as f32 / 9_f32);
 
-    let start_time = Instant::now();
-    let progress_bar_style = ProgressStyle::with_template("{wide_bar} {progress_info}")
+    Ok(sink)
+}
+
+pub fn play_audio_from_url(
+    url: &str,
+    volume: u8,
+    audio_duration_sec: u64,
+    file_size_bytes: u64,
+) -> PlaybackResult {
+    let client = Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()
+        .expect("Failed to create HTTP client");
+    let (_stream, stream_handle) =
+        OutputStream::try_default().expect("Failed to create audio stream");
+
+    let mut sink = start_playback_from_offset(&client, url, &stream_handle, volume, 0)
+        .expect("Failed to start audio playback");
+
+    // Estimate average bytes per second for seeking via Range requests.
+    // Falls back to 0 (seek disabled) if file size or duration is unknown.
+    let bytes_per_sec = if audio_duration_sec > 0 && file_size_bytes > 0 {
+        file_size_bytes / audio_duration_sec
+    } else {
+        0
+    };
+
+    // Track the logical position in the track (in seconds). This is updated
+    // by wall-clock time during normal playback and directly set on seek.
+    let mut current_position_secs: u64 = 0;
+    let mut segment_start_time = Instant::now();
+    let mut total_paused_duration = Duration::ZERO;
+    let mut pause_started_at: Option<Instant> = None;
+
+    let progress_bar_style = ProgressStyle::with_template("{wide_bar} {msg:>8} {progress_info}")
         .unwrap()
         .with_key(
             "progress_info",
@@ -34,16 +125,157 @@ pub fn play_audio_from_url(url: &str, volume: u8, audio_duration_sec: u64) {
         );
     let progress_bar = ProgressBar::new(audio_duration_sec).with_style(progress_bar_style);
 
-    while !sink.empty() {
-        let elapsed = start_time.elapsed();
-        let elapsed_seconds = elapsed.as_secs();
-        progress_bar.set_position(elapsed_seconds);
-        if elapsed_seconds >= audio_duration_sec {
+    // Print controls hint before entering raw mode so \n works normally.
+    if bytes_per_sec > 0 {
+        println!("Controls: [space] pause/resume  [\u{2190}/h] -10s  [\u{2192}/l] +10s  [q] stop");
+    } else {
+        println!("Controls: [space] pause/resume  [q] stop");
+    }
+
+    // Try to enable raw mode for key event capture. If it fails (e.g. no TTY,
+    // CI, piped output), fall back to non-interactive playback.
+    let raw_guard = RawModeGuard::enable().ok();
+    let interactive = raw_guard.is_some();
+
+    let mut result = PlaybackResult::Finished;
+
+    loop {
+        if sink.empty() {
             break;
         }
-        std::thread::sleep(Duration::from_secs(1));
+
+        // Calculate effective elapsed time within the current playback segment
+        // (excluding paused periods), then add to the base position.
+        let display_position = current_position_secs
+            + segment_elapsed_secs(segment_start_time, pause_started_at, total_paused_duration);
+
+        progress_bar.set_position(display_position);
+
+        if display_position >= audio_duration_sec {
+            break;
+        }
+
+        if interactive {
+            // Poll for key events with a short timeout (serves as the loop sleep too)
+            if event::poll(Duration::from_millis(200)).unwrap_or(false) {
+                if let Ok(Event::Key(key_event)) = event::read() {
+                    // Only handle key press events (not release/repeat)
+                    if key_event.kind == KeyEventKind::Press {
+                        match key_event.code {
+                            KeyCode::Char(' ') => {
+                                if sink.is_paused() {
+                                    // Resuming — accumulate the time spent paused
+                                    if let Some(paused_at) = pause_started_at.take() {
+                                        total_paused_duration += paused_at.elapsed();
+                                    }
+                                    sink.play();
+                                    progress_bar.set_message("");
+                                } else {
+                                    // Pausing — record when we paused
+                                    pause_started_at = Some(Instant::now());
+                                    sink.pause();
+                                    progress_bar.set_message("[PAUSED]");
+                                }
+                            }
+                            KeyCode::Char('q') => {
+                                sink.stop();
+                                result = PlaybackResult::Quit;
+                                break;
+                            }
+                            KeyCode::Char('c')
+                                if key_event.modifiers.contains(KeyModifiers::CONTROL) =>
+                            {
+                                sink.stop();
+                                result = PlaybackResult::Quit;
+                                break;
+                            }
+                            KeyCode::Right | KeyCode::Char('l') if bytes_per_sec > 0 => {
+                                // Seek forward: compute new position
+                                let seg_secs = segment_elapsed_secs(
+                                    segment_start_time,
+                                    pause_started_at,
+                                    total_paused_duration,
+                                );
+                                let new_pos = (current_position_secs + seg_secs + SEEK_STEP_SECS)
+                                    .min(audio_duration_sec);
+
+                                if new_pos >= audio_duration_sec {
+                                    break;
+                                }
+
+                                let byte_offset = new_pos * bytes_per_sec;
+                                // Create the new sink before stopping the old one so that
+                                // playback continues uninterrupted if the Range request fails.
+                                match start_playback_from_offset(
+                                    &client,
+                                    url,
+                                    &stream_handle,
+                                    volume,
+                                    byte_offset,
+                                ) {
+                                    Ok(new_sink) => {
+                                        sink.stop();
+                                        sink = new_sink;
+                                        current_position_secs = new_pos;
+                                        segment_start_time = Instant::now();
+                                        total_paused_duration = Duration::ZERO;
+                                        pause_started_at = None;
+                                        progress_bar.set_message("");
+                                    }
+                                    Err(_) => {
+                                        // Seek failed — keep playing from the current position
+                                    }
+                                }
+                            }
+                            KeyCode::Left | KeyCode::Char('h') if bytes_per_sec > 0 => {
+                                // Seek backward: compute new position
+                                let seg_secs = segment_elapsed_secs(
+                                    segment_start_time,
+                                    pause_started_at,
+                                    total_paused_duration,
+                                );
+                                let new_pos = (current_position_secs + seg_secs)
+                                    .saturating_sub(SEEK_STEP_SECS);
+
+                                let byte_offset = new_pos * bytes_per_sec;
+                                // Create the new sink before stopping the old one so that
+                                // playback continues uninterrupted if the Range request fails.
+                                match start_playback_from_offset(
+                                    &client,
+                                    url,
+                                    &stream_handle,
+                                    volume,
+                                    byte_offset,
+                                ) {
+                                    Ok(new_sink) => {
+                                        sink.stop();
+                                        sink = new_sink;
+                                        current_position_secs = new_pos;
+                                        segment_start_time = Instant::now();
+                                        total_paused_duration = Duration::ZERO;
+                                        pause_started_at = None;
+                                        progress_bar.set_message("");
+                                    }
+                                    Err(_) => {
+                                        // Seek failed — keep playing from the current position
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        } else {
+            std::thread::sleep(Duration::from_millis(200));
+        }
     }
-    progress_bar.finish();
+
+    progress_bar.finish_and_clear();
+    // raw_guard is dropped here (if set), restoring the terminal
+    drop(raw_guard);
+
+    result
 }
 
 pub fn parse_duration(s: &str) -> Option<Duration> {

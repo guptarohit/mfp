@@ -16,11 +16,12 @@ license = "BSD-3-Clause"
 
 [dependencies]
 reqwest = { version = "0.11.18", features = ["blocking"] }
-rss = "2.0.4"
+rss = "2.0.12"
 rodio = "0.17.1"
 rand = "0.8.5"
-minimp3 = "0.5.1"
-clap = { version = "4.3.10", features = ["derive"] }
-indicatif = "0.17.5"
+minimp3_fixed = "0.5.4"
+clap = { version = "4.6.0", features = ["derive"] }
+crossterm = "0.29"
+indicatif = "0.17.11"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
