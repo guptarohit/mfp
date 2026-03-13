@@ -1,41 +1,26 @@
-name: Release
+name: Rebuild Release Assets
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag (for example v0.3.0)
+        required: true
+        type: string
+      publish_crate:
+        description: Also publish the crate to crates.io
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
-  issues: write
-  pull-requests: write
-
-concurrency:
-  group: release-please-${{ github.ref }}
-  cancel-in-progress: false
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  release-please:
-    runs-on: ubuntu-latest
-    outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
-      version: ${{ steps.release.outputs.version }}
-    steps:
-      - name: Run release-please
-        id: release
-        uses: googleapis/release-please-action@v4
-        with:
-          token: ${{ secrets.GH_PAT }}
-          config-file: release-please-config.json
-          manifest-file: .release-please-manifest.json
-
   build-and-upload:
-    needs: release-please
-    if: ${{ needs.release-please.outputs.release_created }}
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -59,7 +44,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.release-please.outputs.tag_name }}
+          ref: ${{ inputs.tag }}
 
       - name: Set exe extension for Windows
         run: echo "EXE=.exe" >> $env:GITHUB_ENV
@@ -81,19 +66,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload --clobber ${{ needs.release-please.outputs.tag_name }} \
-            "target/${{ matrix.target }}/release/mfp${{ env.EXE }}#mfp-${{ needs.release-please.outputs.version }}-${{ matrix.artifact-name }}${{ env.EXE }}"
+          version="${{ inputs.tag }}"
+          version="${version#v}"
+          gh release upload --clobber "${{ inputs.tag }}" \
+            "target/${{ matrix.target }}/release/mfp${{ env.EXE }}#mfp-${version}-${{ matrix.artifact-name }}${{ env.EXE }}"
         shell: bash
 
   publish-crate:
-    needs: [release-please, build-and-upload]
-    if: ${{ needs.release-please.outputs.release_created }}
+    needs: build-and-upload
+    if: ${{ inputs.publish_crate }}
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.release-please.outputs.tag_name }}
+          ref: ${{ inputs.tag }}
 
       - name: Install libasound2-dev
         run: |
