@@ -18,7 +18,7 @@ cargo install mfp
 
 Or download pre-built binary from [GitHub release page](https://github.com/guptarohit/mfp/releases).
 
-After installation, run `mfp` in command line to start. Plays a random track if not specified with `-t` flag.
+After installation, run `mfp` in command line to start. Plays a random track if not specified with `-t` flag. Interactive playback controls are available during playback.
 
 
 ## Usage
@@ -34,6 +34,17 @@ Options:
 ```
 
 e.g. `mfp -t 1 -v 7`
+
+### Playback Controls
+
+| Key              | Action              |
+|------------------|---------------------|
+| `Space`          | Pause / Resume      |
+| `q` / `Ctrl+C`  | Stop                |
+| `Right` / `l`   | Seek forward 10s    |
+| `Left` / `h`    | Seek backward 10s   |
+| `+` / `=`       | Volume up           |
+| `-` / `_`       | Volume down         |
 
 
 ## Acknowledgements
