@@ -46,7 +46,7 @@ fn play_episode(episode: &mfp::Episode, volume: u8) -> PlaybackResult {
     let episode_duration = parse_duration(&episode.duration).unwrap().as_secs();
 
     if let Some(enclosure) = &episode.enclosure {
-        play_audio_from_url(&enclosure.url, volume, episode_duration)
+        play_audio_from_url(&enclosure.url, volume, episode_duration, enclosure.length)
     } else {
         eprintln!("No track data for the selected track");
         PlaybackResult::Finished
