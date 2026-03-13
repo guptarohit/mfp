@@ -12,6 +12,7 @@ use rodio::Source;
 
 use utils::parse_duration;
 use utils::play_audio_from_url;
+use utils::PlaybackResult;
 
 fn play_random_episodes(rss_feed: &mut Mfp, volume: u8) {
     let mut rng = thread_rng();
@@ -23,28 +24,32 @@ fn play_random_episodes(rss_feed: &mut Mfp, volume: u8) {
 
     loop {
         if let Some(random_episode) = rss_feed.items.choose_mut(&mut rng) {
-            play_episode(random_episode, volume);
+            let quit = matches!(play_episode(random_episode, volume), PlaybackResult::Quit);
             let played_title = random_episode.title.clone();
             rss_feed
                 .items
                 .retain(|episode| episode.title != played_title);
+            if quit {
+                return;
+            }
         } else {
-            println!("All tracks have been played 🎶");
+            println!("All tracks have been played");
             return;
         }
     }
 }
 
-fn play_episode(episode: &mfp::Episode, volume: u8) {
+fn play_episode(episode: &mfp::Episode, volume: u8) -> PlaybackResult {
     println!("Track name: {}", episode.title);
     println!("Track published date: {}", episode.pub_date);
 
     let episode_duration = parse_duration(&episode.duration).unwrap().as_secs();
 
     if let Some(enclosure) = &episode.enclosure {
-        play_audio_from_url(&enclosure.url, volume, episode_duration);
+        play_audio_from_url(&enclosure.url, volume, episode_duration)
     } else {
         eprintln!("No track data for the selected track");
+        PlaybackResult::Finished
     }
 }
 

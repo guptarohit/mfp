@@ -3,8 +3,35 @@ use rodio::OutputStream;
 use std::fmt::Write;
 
 use crate::mp3_stream_decoder::Mp3StreamDecoder;
+use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use std::time::{Duration, Instant};
+
+/// Result of audio playback — whether the track finished naturally or the user quit.
+pub enum PlaybackResult {
+    /// Track played to completion.
+    Finished,
+    /// User pressed 'q' to stop playback.
+    Quit,
+}
+
+/// Guard that disables raw mode when dropped, ensuring the terminal is restored
+/// even on panic or early return.
+struct RawModeGuard;
+
+impl RawModeGuard {
+    fn enable() -> Result<Self, std::io::Error> {
+        enable_raw_mode()?;
+        Ok(RawModeGuard)
+    }
+}
+
+impl Drop for RawModeGuard {
+    fn drop(&mut self) {
+        let _ = disable_raw_mode();
+    }
+}
 
 pub fn fetch_rss_data(url: &str) -> Result<String, Box<dyn std::error::Error>> {
     let response = get(url)?;
@@ -12,7 +39,7 @@ pub fn fetch_rss_data(url: &str) -> Result<String, Box<dyn std::error::Error>> {
     Ok(body)
 }
 
-pub fn play_audio_from_url(url: &str, volume: u8, audio_duration_sec: u64) {
+pub fn play_audio_from_url(url: &str, volume: u8, audio_duration_sec: u64) -> PlaybackResult {
     let http_response = get(url).expect("Failed to fetch audio file");
     let source = Mp3StreamDecoder::new(http_response).unwrap();
     let (_stream, stream_handle) =
@@ -23,7 +50,10 @@ pub fn play_audio_from_url(url: &str, volume: u8, audio_duration_sec: u64) {
     sink.set_volume(volume as f32 / 9_f32);
 
     let start_time = Instant::now();
-    let progress_bar_style = ProgressStyle::with_template("{wide_bar} {progress_info}")
+    let mut total_paused_duration = Duration::ZERO;
+    let mut pause_started_at: Option<Instant> = None;
+
+    let progress_bar_style = ProgressStyle::with_template("{wide_bar} {msg:>8} {progress_info}")
         .unwrap()
         .with_key(
             "progress_info",
@@ -34,16 +64,74 @@ pub fn play_audio_from_url(url: &str, volume: u8, audio_duration_sec: u64) {
         );
     let progress_bar = ProgressBar::new(audio_duration_sec).with_style(progress_bar_style);
 
+    // Print controls hint before entering raw mode so \n works normally.
+    println!("Controls: [space] pause/resume  [q] stop");
+
+    // Try to enable raw mode for key event capture. If it fails (e.g. no TTY,
+    // CI, piped output), fall back to non-interactive playback.
+    let raw_guard = RawModeGuard::enable().ok();
+    let interactive = raw_guard.is_some();
+
+    let mut result = PlaybackResult::Finished;
+
     while !sink.empty() {
-        let elapsed = start_time.elapsed();
-        let elapsed_seconds = elapsed.as_secs();
+        // Calculate effective elapsed time (excluding paused periods)
+        let effective_elapsed = if let Some(paused_at) = pause_started_at {
+            // Currently paused — freeze at the moment we paused
+            paused_at.duration_since(start_time) - total_paused_duration
+        } else {
+            start_time.elapsed() - total_paused_duration
+        };
+        let elapsed_seconds = effective_elapsed.as_secs();
+
         progress_bar.set_position(elapsed_seconds);
+
         if elapsed_seconds >= audio_duration_sec {
             break;
         }
-        std::thread::sleep(Duration::from_secs(1));
+
+        if interactive {
+            // Poll for key events with a short timeout (serves as the loop sleep too)
+            if event::poll(Duration::from_millis(200)).unwrap_or(false) {
+                if let Ok(Event::Key(key_event)) = event::read() {
+                    // Only handle key press events (not release/repeat)
+                    if key_event.kind == KeyEventKind::Press {
+                        match key_event.code {
+                            KeyCode::Char(' ') => {
+                                if sink.is_paused() {
+                                    // Resuming — accumulate the time spent paused
+                                    if let Some(paused_at) = pause_started_at.take() {
+                                        total_paused_duration += paused_at.elapsed();
+                                    }
+                                    sink.play();
+                                    progress_bar.set_message("");
+                                } else {
+                                    // Pausing — record when we paused
+                                    pause_started_at = Some(Instant::now());
+                                    sink.pause();
+                                    progress_bar.set_message("[PAUSED]");
+                                }
+                            }
+                            KeyCode::Char('q') => {
+                                sink.stop();
+                                result = PlaybackResult::Quit;
+                                break;
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        } else {
+            std::thread::sleep(Duration::from_millis(200));
+        }
     }
-    progress_bar.finish();
+
+    progress_bar.finish_and_clear();
+    // raw_guard is dropped here (if set), restoring the terminal
+    drop(raw_guard);
+
+    result
 }
 
 pub fn parse_duration(s: &str) -> Option<Duration> {
