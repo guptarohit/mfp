@@ -96,7 +96,8 @@ pub fn play_audio_from_url(
     let (_stream, stream_handle) =
         OutputStream::try_default().expect("Failed to create audio stream");
 
-    let mut sink = start_playback_from_offset(&client, url, &stream_handle, volume, 0)
+    let mut current_volume = volume;
+    let mut sink = start_playback_from_offset(&client, url, &stream_handle, current_volume, 0)
         .expect("Failed to start audio playback");
 
     // Estimate average bytes per second for seeking via Range requests.
@@ -114,7 +115,7 @@ pub fn play_audio_from_url(
     let mut total_paused_duration = Duration::ZERO;
     let mut pause_started_at: Option<Instant> = None;
 
-    let progress_bar_style = ProgressStyle::with_template("{wide_bar} {msg:>8} {progress_info}")
+    let progress_bar_style = ProgressStyle::with_template("{wide_bar} {msg:>9} {progress_info}")
         .unwrap()
         .with_key(
             "progress_info",
@@ -127,9 +128,9 @@ pub fn play_audio_from_url(
 
     // Print controls hint before entering raw mode so \n works normally.
     if bytes_per_sec > 0 {
-        println!("Controls: [space] pause/resume  [\u{2190}/h] -10s  [\u{2192}/l] +10s  [q] stop");
+        println!("Controls: [space] pause/resume  [\u{2190}/h] -10s  [\u{2192}/l] +10s  [+/-] volume  [q] stop");
     } else {
-        println!("Controls: [space] pause/resume  [q] stop");
+        println!("Controls: [space] pause/resume  [+/-] volume  [q] stop");
     }
 
     // Try to enable raw mode for key event capture. If it fails (e.g. no TTY,
@@ -210,7 +211,7 @@ pub fn play_audio_from_url(
                                     &client,
                                     url,
                                     &stream_handle,
-                                    volume,
+                                    current_volume,
                                     byte_offset,
                                 ) {
                                     Ok(new_sink) => {
@@ -244,7 +245,7 @@ pub fn play_audio_from_url(
                                     &client,
                                     url,
                                     &stream_handle,
-                                    volume,
+                                    current_volume,
                                     byte_offset,
                                 ) {
                                     Ok(new_sink) => {
@@ -259,6 +260,20 @@ pub fn play_audio_from_url(
                                     Err(_) => {
                                         // Seek failed — keep playing from the current position
                                     }
+                                }
+                            }
+                            KeyCode::Char('+') | KeyCode::Char('=') => {
+                                if current_volume < 9 {
+                                    current_volume += 1;
+                                    sink.set_volume(current_volume as f32 / 9_f32);
+                                    progress_bar.set_message(format!("[VOL {current_volume}/9]"));
+                                }
+                            }
+                            KeyCode::Char('-') | KeyCode::Char('_') => {
+                                if current_volume > 0 {
+                                    current_volume -= 1;
+                                    sink.set_volume(current_volume as f32 / 9_f32);
+                                    progress_bar.set_message(format!("[VOL {current_volume}/9]"));
                                 }
                             }
                             _ => {}
