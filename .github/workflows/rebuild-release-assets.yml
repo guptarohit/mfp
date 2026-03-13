@@ -66,8 +66,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          VERSION="${{ inputs.tag }}"
+          VERSION="${VERSION#v}"
           gh release upload --clobber "${{ inputs.tag }}" \
-            "target/${{ matrix.target }}/release/mfp${{ env.EXE }}#mfp-${{ replace(inputs.tag, 'v', '') }}-${{ matrix.artifact-name }}${{ env.EXE }}"
+            "target/${{ matrix.target }}/release/mfp${{ env.EXE }}#mfp-${VERSION}-${{ matrix.artifact-name }}${{ env.EXE }}"
         shell: bash
 
   publish-crate:
