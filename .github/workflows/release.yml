@@ -81,8 +81,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload --clobber ${{ needs.release-please.outputs.tag_name }} \
-            "target/${{ matrix.target }}/release/mfp${{ env.EXE }}#mfp-${{ needs.release-please.outputs.version }}-${{ matrix.artifact-name }}${{ env.EXE }}"
+          ASSET="mfp-${{ needs.release-please.outputs.version }}-${{ matrix.artifact-name }}${{ env.EXE }}"
+          cp "target/${{ matrix.target }}/release/mfp${{ env.EXE }}" "${ASSET}"
+          gh release upload --clobber ${{ needs.release-please.outputs.tag_name }} "${ASSET}"
         shell: bash
 
   publish-crate:

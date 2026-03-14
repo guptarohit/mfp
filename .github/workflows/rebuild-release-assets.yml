@@ -68,8 +68,9 @@ jobs:
         run: |
           VERSION="${{ inputs.tag }}"
           VERSION="${VERSION#v}"
-          gh release upload --clobber "${{ inputs.tag }}" \
-            "target/${{ matrix.target }}/release/mfp${{ env.EXE }}#mfp-${VERSION}-${{ matrix.artifact-name }}${{ env.EXE }}"
+          ASSET="mfp-${VERSION}-${{ matrix.artifact-name }}${{ env.EXE }}"
+          cp "target/${{ matrix.target }}/release/mfp${{ env.EXE }}" "${ASSET}"
+          gh release upload --clobber "${{ inputs.tag }}" "${ASSET}"
         shell: bash
 
   publish-crate:
