@@ -150,11 +150,7 @@ pub fn play_audio_from_url(
         let display_position = current_position_secs
             + segment_elapsed_secs(segment_start_time, pause_started_at, total_paused_duration);
 
-        progress_bar.set_position(display_position);
-
-        if display_position >= audio_duration_sec {
-            break;
-        }
+        progress_bar.set_position(display_position.min(audio_duration_sec));
 
         if interactive {
             // Poll for key events with a short timeout (serves as the loop sleep too)
