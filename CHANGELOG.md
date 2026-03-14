@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.2](https://github.com/guptarohit/mfp/compare/v0.3.1...v0.3.2) (2026-03-14)
+
+
+### Fixed
+
+* avoid file#label syntax in gh release upload for Linux compatibility ([01c69ee](https://github.com/guptarohit/mfp/commit/01c69ee252a282ffe8d8475bd6aaad8d6216cfc3))
+* songs cut off early when RSS duration is shorter than actual audio ([2f2e88b](https://github.com/guptarohit/mfp/commit/2f2e88b8394be93394d6beafa4e2102cfa653a46)), closes [#1](https://github.com/guptarohit/mfp/issues/1)
+
 ## [0.3.1](https://github.com/guptarohit/mfp/compare/v0.3.0...v0.3.1) (2026-03-13)
 
 
