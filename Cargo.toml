@@ -18,7 +18,7 @@ license = "BSD-3-Clause"
 reqwest = { version = "0.11.18", features = ["blocking"] }
 rss = "2.0.12"
 rodio = "0.17.1"
-rand = "0.8.5"
+rand = "0.8.6"
 minimp3_fixed = "0.5.4"
 clap = { version = "4.6.0", features = ["derive"] }
 crossterm = "0.29"
